@@ -55,8 +55,14 @@ class QAApp: Application() {
         return null
     }
 
-    fun readFavorite() :ArrayList<Favorite> {
-        return favoriteList
+    fun createQuestionUidList() :ArrayList<String> {
+        var questionUidList: ArrayList<String> = ArrayList()
+        if (favoriteList.size > 0) {
+            for (i in 0..favoriteList.size-1) {
+                questionUidList.add(favoriteList[i].questionUid)
+            }
+        }
+        return questionUidList
     }
 
     fun checkFavorite() {

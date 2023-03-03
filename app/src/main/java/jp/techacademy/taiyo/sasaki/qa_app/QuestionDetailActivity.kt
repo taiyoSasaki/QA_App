@@ -84,11 +84,10 @@ class QuestionDetailActivity : AppCompatActivity() {
             onClickAddFavorite = {
                 // プログレスバーを表示する
                 progressBar.visibility = View.VISIBLE
-                //ByteArrayからStringに変換
-                val imageString = Base64.encodeToString(it.imageBytes, Base64.DEFAULT)
+                //Firebaseへ追加するときのkeyを取得
                 val key = mFavoriteRef.push().key ?: ""
 
-                val favorite = Favorite(key, it.title, it.name, it.questionUid, imageString)
+                val favorite = Favorite(key, it.questionUid)
                 val data = favorite.toMap()
 
                 val childUpdates = hashMapOf<String, Any>(key to data)

@@ -3,6 +3,7 @@ package jp.techacademy.taiyo.sasaki.qa_app
 import android.content.Intent
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import android.view.Menu
 import android.view.MenuItem
@@ -23,6 +24,7 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
     private lateinit var mDatabaseReference: DatabaseReference
     private lateinit var mQuestionArrayList: ArrayList<Question>
     private var mFavoriteList: ArrayList<Favorite> = ArrayList<Favorite>()
+    private var mFavoriteQuestionUidList: ArrayList<String> = ArrayList<String>()
     private lateinit var mAdapter: QuestionsListAdapter
 
     private var mGenreRef: DatabaseReference? = null
@@ -32,12 +34,9 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         override fun onChildAdded(dataSnapshot: DataSnapshot, previousChildName: String?) {
             val map = dataSnapshot.value as Map<String, String>
             val key = dataSnapshot.key ?: ""
-            val title = map["title"] ?: ""
-            val name = map["name"] ?: ""
             val questionUid = map["questionUid"] ?: ""
-            val imageString = map["image"] ?: ""
 
-            val favorite = Favorite(key, title, name, questionUid, imageString)
+            val favorite = Favorite(key, questionUid)
             mFavoriteList.add(favorite)
             mAdapter.notifyDataSetChanged()
 
@@ -109,7 +108,7 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
                         for (key in answerMap.keys) {
                             val temp = answerMap[key] as Map<String, String>
                             val answerBody = temp["body"] ?: ""
-                            val answerName = temp[" name"] ?: ""
+                            val answerName = temp["name"] ?: ""
                             val answerUid = temp["uid"] ?: ""
                             val answer = Answer(answerBody, answerName, answerUid, key)
                             question.answers.add(answer)
@@ -135,6 +134,64 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
 
     }
 
+    private var mContentsListener= object : ChildEventListener {
+        override fun onChildAdded(dataSnapshot: DataSnapshot, previousChildName: String?) {
+            Log.d("onAdd", "$dataSnapshot")
+            val data = dataSnapshot.value as Map<String, Any>
+            for (id in data.keys) {
+                for (questionUid in mFavoriteQuestionUidList) {
+                    if (id == questionUid) {
+                        val map = data[id] as Map<String, String>
+                        val title = map["title"] ?: ""
+                        val body = map["body"] ?: ""
+                        val name = map["name"] ?: ""
+                        val uid = map["uid"] ?: ""
+                        val imageString = map["image"] ?: ""
+                        val bytes =
+                            if (imageString.isNotEmpty()) {
+                                Base64.decode(imageString, Base64.DEFAULT)
+                            } else {
+                                byteArrayOf()
+                            }
+
+                        val answerArrayList = ArrayList<Answer>()
+                        val answerMap = map["answer"] as Map<String, String>?
+                        if (answerMap != null) {
+                            for (key in answerMap.keys) {
+                                val temp = answerMap[key] as Map<String, String>
+                                val answerBody = temp["body"] ?: ""
+                                val answerName = temp["name"] ?: ""
+                                val answerUid = temp["uid"] ?: ""
+                                val answer = Answer(answerBody, answerName, answerUid, key)
+                                answerArrayList.add(answer)
+                            }
+                        }
+
+                        val question = Question(title, body, name, uid, questionUid, dataSnapshot.key!!.toInt(), bytes, answerArrayList)
+                        mQuestionArrayList.add(question)
+                        mAdapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+
+        override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+
+        }
+
+        override fun onChildRemoved(snapshot: DataSnapshot) {
+
+        }
+
+        override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+
+        }
+
+        override fun onCancelled(error: DatabaseError) {
+
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -146,24 +203,24 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         //fabにClickリスナーを登録
         fab.setOnClickListener { view ->
             //ジャンルを選択していない場合 (mGenre == 0)はエラーを表示するだけ
-            if (mGenre == 0) {
+            if (mGenre == 0 or 5) {
                 Snackbar.make(view, getString(R.string.question_no_select_genre), Snackbar.LENGTH_LONG).show()
             } else {
+                //ログイン済みのユーザーを取得する
+                val user = FirebaseAuth.getInstance().currentUser
 
+                //ログインしていなければログイン画面に遷移させる
+                if (user == null) {
+                    val intent = Intent(applicationContext, LoginActivity::class.java)
+                    startActivity(intent)
+                } else {
+                    //ジャンルを渡して質問作成画面に遷移させる
+                    val intent = Intent(applicationContext, QuestionSendActivity::class.java)
+                    intent.putExtra("genre", mGenre)
+                    startActivity(intent)
+                }
             }
-            //ログイン済みのユーザーを取得する
-            val user = FirebaseAuth.getInstance().currentUser
 
-            //ログインしていなければログイン画面に遷移させる
-            if (user == null) {
-                val intent = Intent(applicationContext, LoginActivity::class.java)
-                startActivity(intent)
-            } else {
-                //ジャンルを渡して質問作成画面に遷移させる
-                val intent = Intent(applicationContext, QuestionSendActivity::class.java)
-                intent.putExtra("genre", mGenre)
-                startActivity(intent)
-            }
         }
 
         //ナビゲーションドロワーの設定
@@ -267,13 +324,26 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         mAdapter.setQuestionArrayList(mQuestionArrayList)
         listView.adapter = mAdapter
 
-        //選択したジャンルにリスナーを登録する
-        if (mGenreRef != null) {
-            mGenreRef!!.removeEventListener(mEventListener)
-        }
-        mGenreRef = mDatabaseReference.child(ContentsPATH).child(mGenre.toString())
-        mGenreRef!!.addChildEventListener(mEventListener)
+        if (mGenre == 5) {
+            //お気に入りリストのquestionUidリストを取得
+            val myApp = QAApp.getInstance()
+            mFavoriteQuestionUidList = myApp.createQuestionUidList()
 
+            //全ジャンルを有しているcontentsにリスナーを登録し、お気に入りリストのquestionUidを持つQuestionを探す
+            if (mGenreRef != null) {
+                mGenreRef!!.removeEventListener(mEventListener)
+            }
+            mGenreRef = mDatabaseReference.child(ContentsPATH)
+            mGenreRef!!.addChildEventListener(mContentsListener)
+
+        } else {
+            //選択したジャンルにリスナーを登録する
+            if (mGenreRef != null) {
+                mGenreRef!!.removeEventListener(mEventListener)
+            }
+            mGenreRef = mDatabaseReference.child(ContentsPATH).child(mGenre.toString())
+            mGenreRef!!.addChildEventListener(mEventListener)
+        }
         return true
     }
 
