@@ -20,7 +20,7 @@ class SettingActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setting)
 
-        //preferenceぁら表示名を取得してEditTextに反映させる
+        //preferenceから表示名を取得してEditTextに反映させる
         val sp = PreferenceManager.getDefaultSharedPreferences(this)
         val name = sp.getString(NameKEY, "")
         nameText.setText(name)

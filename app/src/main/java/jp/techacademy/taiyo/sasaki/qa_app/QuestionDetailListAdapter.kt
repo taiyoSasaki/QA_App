@@ -9,6 +9,9 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.core.view.isVisible
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.android.synthetic.main.list_question_detail.view.*
 
 
@@ -23,6 +26,11 @@ class QuestionDetailListAdapter(context: Context, private val mQuestion: Questio
     init {
         mLayoutInflater = context.getSystemService(Context.LAYOUT_INFLATER_SERVICE) as LayoutInflater
     }
+
+    //お気に入り追加
+    var onClickAddFavorite: ((Question) -> Unit)? = null
+    //お気に入り削除
+    var onClickRemoveFavorite: ((Question) -> Unit)? = null
 
     override fun getCount(): Int {
         return 1 + mQuestion.answers.size
@@ -63,6 +71,35 @@ class QuestionDetailListAdapter(context: Context, private val mQuestion: Questio
 
             val nameTextView = convertView.nameTextView as TextView
             nameTextView.text = name
+
+            val user = FirebaseAuth.getInstance().currentUser
+            val mDatabaseReference = FirebaseDatabase.getInstance().reference
+
+            if (user != null) {  //ログインされている場合
+                val favoriteImageView = convertView.favoriteImageView as ImageView
+                favoriteImageView.isVisible = true
+
+                //お気に入り情報の取得
+                val myApp = QAApp.getInstance()
+                val isFavorite = myApp.findBy(mQuestion.questionUid) //Applicationクラスでお気に入りのQuestionUidを保持、そこから確認
+
+                favoriteImageView.apply {
+                    setImageResource(if (isFavorite) R.drawable.ic_star else R.drawable.ic_star_border)
+                    setOnClickListener {
+                        if (isFavorite) {
+                            //お気に入り削除発火!
+                            onClickRemoveFavorite?.invoke(mQuestion)
+                        } else {
+                            //お気に入り追加発火!
+                            onClickAddFavorite?.invoke(mQuestion)
+                        }
+                        notifyDataSetChanged()
+                    }
+                }
+            } else {
+                val favoriteImageView = convertView.favoriteImageView as ImageView
+                favoriteImageView.isVisible = false
+            }
 
             val bytes = mQuestion.imageBytes
             if (bytes.isNotEmpty()) {

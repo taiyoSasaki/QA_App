@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <ImageView
         android:layout_width="120dp"
@@ -18,8 +19,17 @@
         android:text="New Text"
         android:id="@+id/bodyTextView"
         android:inputType="textMultiLine"
-        android:layout_alignTop="@+id/imageView"
+        android:layout_below="@id/favoriteImageView"
         android:layout_toEndOf="@+id/imageView" />
+
+    <ImageView
+        android:id="@+id/favoriteImageView"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:src="@drawable/ic_star"
+        android:layout_alignTop="@+id/imageView"
+        android:layout_alignParentRight="true"
+        app:tint="@android:color/holo_orange_light"/>
 
     <TextView
         android:layout_width="wrap_content"

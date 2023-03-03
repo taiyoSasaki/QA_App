@@ -27,6 +27,7 @@
     <string name="menu_life_label">生活</string>
     <string name="menu_health_label">健康</string>
     <string name="menu_computer_label">コンピューター</string>
+    <string name="menu_favorite_label">お気に入り</string>
 
     <!-- 設定画面用文字列 -->
     <string name="settings_title">設定</string>
@@ -57,5 +58,8 @@
 
     <string name="send_answer_failure">投稿に失敗しました</string>
     <string name="answer_error_message">回答を入力してください</string>
+
+    <!-- お気に入り登録用 -->
+    <string name="favorite_save_error_message">お気に入りの保存に失敗しました</string>
 
 </resources>

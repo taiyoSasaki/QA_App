@@ -42,7 +42,7 @@ class QuestionSendActivity : AppCompatActivity(), View.OnClickListener, Database
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_question_send)
 
-        //渡ってきたジャンルの番号をを保持する
+        //渡ってきたジャンルの番号を保持する
         val extras = intent.extras
         mGenre = extras!!.getInt("genre")
 

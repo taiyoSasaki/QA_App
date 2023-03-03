@@ -3,15 +3,21 @@ package jp.techacademy.taiyo.sasaki.qa_app
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Base64
+import android.view.View
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.*
 import kotlinx.android.synthetic.main.activity_question_detail.*
+import kotlinx.android.synthetic.main.activity_question_detail.progressBar
+
 
 class QuestionDetailActivity : AppCompatActivity() {
 
     private lateinit var mQuestion: Question
     private lateinit var mAdapter: QuestionDetailListAdapter
+    private lateinit var mDatabaseReference: DatabaseReference
     private lateinit var mAnswerRef: DatabaseReference
+    private lateinit var mFavoriteRef: DatabaseReference
 
     private val mEventListener = object : ChildEventListener {
         override fun onChildAdded(dataSnapshot: DataSnapshot, s: String?) {
@@ -57,6 +63,13 @@ class QuestionDetailActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_question_detail)
 
+        //ログインしているユーザーのお気に入りフォルダのパス指定
+        mDatabaseReference = FirebaseDatabase.getInstance().reference
+        val user = FirebaseAuth.getInstance().currentUser
+        if (user != null) {
+            mFavoriteRef = mDatabaseReference.child(FavoritesPATH).child(user.uid)
+        }
+
         //渡ってきたQuestionのオブジェクトを保存する
         val extras = intent.extras
         mQuestion = extras!!.get("question") as Question
@@ -65,6 +78,58 @@ class QuestionDetailActivity : AppCompatActivity() {
 
         //ListViewの準備
         mAdapter = QuestionDetailListAdapter(this, mQuestion)
+
+        //お気に入りクリックの受け取り
+        mAdapter.apply {
+            onClickAddFavorite = {
+                // プログレスバーを表示する
+                progressBar.visibility = View.VISIBLE
+                //ByteArrayからStringに変換
+                val imageString = Base64.encodeToString(it.imageBytes, Base64.DEFAULT)
+                val key = mFavoriteRef.push().key ?: ""
+
+                val favorite = Favorite(key, it.title, it.name, it.questionUid, imageString)
+                val data = favorite.toMap()
+
+                val childUpdates = hashMapOf<String, Any>(key to data)
+                //Firebaseを更新する
+                mFavoriteRef.updateChildren(childUpdates)
+                    .addOnSuccessListener {
+                        //保存の完了メソッド
+                        val myApp = QAApp.getInstance()
+                        myApp.addFavorite(favorite)
+                        mAdapter.notifyDataSetChanged()
+                        //プログレスバーを非表示にする
+                        progressBar.visibility = View.GONE
+                    }
+            }
+
+            onClickRemoveFavorite = {
+                // プログレスバーを表示する
+                progressBar.visibility = View.VISIBLE
+                val questionUid = it.questionUid
+
+                //QAAppのお気に入りリストから削除し、同時にFirebaseから削除するためのkeyを取得
+                val myApp = QAApp.getInstance()
+                val key = myApp.findKey(questionUid)
+                if (key != null) {
+                    val childUpdates = hashMapOf<String, Any?>(key to null)
+                    //Firebaseを更新する
+                    mFavoriteRef.updateChildren(childUpdates)
+                        .addOnSuccessListener {
+                            //保存の完了メソッド
+                            myApp.removeFavorite(questionUid)
+                            mAdapter.notifyDataSetChanged()
+                            //プログレスバーを非表示にする
+                            progressBar.visibility = View.GONE
+                        }
+                }
+                mAdapter.notifyDataSetChanged()
+                //プログレスバーを非表示にする
+                progressBar.visibility = View.GONE
+            }
+        }
+
         listView.adapter = mAdapter
         mAdapter.notifyDataSetChanged()
 

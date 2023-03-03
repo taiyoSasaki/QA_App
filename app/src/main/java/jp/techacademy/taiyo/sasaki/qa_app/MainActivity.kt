@@ -22,9 +22,46 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
 
     private lateinit var mDatabaseReference: DatabaseReference
     private lateinit var mQuestionArrayList: ArrayList<Question>
+    private var mFavoriteList: ArrayList<Favorite> = ArrayList<Favorite>()
     private lateinit var mAdapter: QuestionsListAdapter
 
     private var mGenreRef: DatabaseReference? = null
+    private var mFavoriteRef: DatabaseReference? = null
+
+    private val mFavoriteEventListener = object : ChildEventListener {
+        override fun onChildAdded(dataSnapshot: DataSnapshot, previousChildName: String?) {
+            val map = dataSnapshot.value as Map<String, String>
+            val key = dataSnapshot.key ?: ""
+            val title = map["title"] ?: ""
+            val name = map["name"] ?: ""
+            val questionUid = map["questionUid"] ?: ""
+            val imageString = map["image"] ?: ""
+
+            val favorite = Favorite(key, title, name, questionUid, imageString)
+            mFavoriteList.add(favorite)
+            mAdapter.notifyDataSetChanged()
+
+            val myApp = QAApp.getInstance()
+            myApp.setFavorite(mFavoriteList)
+            myApp.checkFavorite()
+        }
+
+        override fun onChildRemoved(snapshot: DataSnapshot) {
+
+        }
+
+        override fun onChildChanged(snapshot: DataSnapshot, previousChildName: String?) {
+
+        }
+
+        override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {
+
+        }
+
+        override fun onCancelled(error: DatabaseError) {
+
+        }
+    }
 
     private val mEventListener = object : ChildEventListener {
         override fun onChildAdded(dataSnapshot: DataSnapshot, s: String?) {
@@ -78,7 +115,6 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
                             question.answers.add(answer)
                         }
                     }
-
 
                     mAdapter.notifyDataSetChanged()
                 }
@@ -146,6 +182,9 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         mAdapter.notifyDataSetChanged()
 
         listView.setOnItemClickListener {parent, view, position, id ->
+            if (mFavoriteRef != null) {
+                mFavoriteRef!!.removeEventListener(mFavoriteEventListener)
+            }
             //Questionのインスタンスを渡して質問詳細画面を起動する
             val intent = Intent(applicationContext, QuestionDetailActivity::class.java)
             intent.putExtra("question", mQuestionArrayList[position])
@@ -159,6 +198,28 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         if (mGenre == 0) {
             onNavigationItemSelected(nav_view.menu.getItem(0))
         }
+
+        //ログインしていないときにお気に入りボタンを非表示にする
+        var user = FirebaseAuth.getInstance().currentUser
+        if (user == null) {  //ログインしていない
+            val menu = nav_view.menu.getItem(4)
+            menu.isVisible = false
+        } else {  //ログインしている
+            val menu = nav_view.menu.getItem(4)
+            menu.isVisible = true
+
+            //ログインしているユーザーのお気に入りにリスナー登録
+            mFavoriteList.clear()
+            val myApp = QAApp.getInstance()
+            myApp.setFavorite(mFavoriteList)
+
+            if (mFavoriteRef != null) {
+                mFavoriteRef!!.removeEventListener(mFavoriteEventListener)
+            }
+            mFavoriteRef = mDatabaseReference.child(FavoritesPATH).child(user.uid)
+            mFavoriteRef!!.addChildEventListener(mFavoriteEventListener)
+        }
+
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -194,6 +255,9 @@ class MainActivity : AppCompatActivity() , NavigationView.OnNavigationItemSelect
         } else if (id == R.id.nav_computer) {
             toolbar.title = getString(R.string.menu_computer_label)
             mGenre = 4
+        } else if (id == R.id.nav_favorite) {
+            toolbar.title = getString(R.string.menu_favorite_label)
+            mGenre = 5
         }
 
         drawer_layout.closeDrawer(GravityCompat.START)
